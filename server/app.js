@@ -5,10 +5,9 @@ import { fetchPlaylist } from '../lib/spotify.js';
 import { filterSafe } from '../lib/safety.js';
 import { downloadTracks } from '../lib/downloader.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
