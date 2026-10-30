@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spotify Playlist Downloader</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b0b0f; color: #eee; }
+      body { max-width: 720px; margin: 0 auto; padding: 24px; }
+      h1 { font-size: 20px; }
+      textarea, input { width: 100%; box-sizing: border-box; background: #16161d; color: #eee; border: 1px solid #2a2a35; border-radius: 8px; padding: 10px; margin: 8px 0; }
+      button { background: #1db954; color: #000; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; cursor: pointer; margin: 8px 4px 0 0; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      ul { list-style: none; padding: 0; }
+      li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #22222b; }
+      .meta { color: #9a9aa5; font-size: 13px; }
+      .explicit { color: #ffb000; font-size: 12px; }
+      #status { margin-top: 12px; color: #9a9aa5; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>Spotify Playlist Downloader</h1>
+    <p>Paste a Spotify playlist URL. Safe tracks only.</p>
+    <textarea id="url" rows="3" placeholder="https://open.spotify.com/playlist/..."></textarea>
+    <button id="fetchBtn">Fetch playlist</button>
+    <div id="status"></div>
+    <ul id="tracks"></ul>
+    <button id="downloadAllBtn" disabled>Download all safe tracks</button>
+
+    <script>
+      const tracks = [];
+      const statusEl = document.getElementById('status');
+      const listEl = document.getElementById('tracks');
+
+      document.getElementById('fetchBtn').onclick = async () => {
+        const url = document.getElementById('url').value.trim();
+        statusEl.textContent = 'Fetching...';
+        listEl.innerHTML = '';
+        try {
+          const res = await fetch('/api/playlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Fetch failed');
+          tracks.length = 0;
+          listEl.innerHTML = '';
+          document.getElementById('downloadAllBtn').disabled = true;
+          for (const t of data.tracks) {
+            tracks.push(t);
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${t.name} <span class="meta">— ${t.artists}</span>${t.isExplicit ? '<span class="explicit">EXPLICIT</span>' : ''}</span>`;
+            const btn = document.createElement('button');
+            btn.textContent = 'Download';
+            btn.onclick = async () => {
+              btn.disabled = true;
+              await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [t.id] }) });
+              btn.disabled = false;
+            };
+            li.appendChild(btn);
+            listEl.appendChild(li);
+          }
+          statusEl.textContent = `Playlist ${data.playlistId}: ${data.tracks.length} safe tracks${data.skipped?.length ? `, skipped ${data.skipped.length}` : ''}.`;
+          document.getElementById('downloadAllBtn').disabled = data.tracks.length === 0;
+        } catch (e) {
+          statusEl.textContent = e.message;
+        }
+      };
+
+      document.getElementById('downloadAllBtn').onclick = async () => {
+        document.getElementById('downloadAllBtn').disabled = true;
+        const res = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: tracks.map((t) => t.id) }) });
+        const data = await res.json();
+        statusEl.textContent = JSON.stringify(data.results);
+        document.getElementById('downloadAllBtn').disabled = false;
+      };
+    </script>
+  </body>
+</html>
